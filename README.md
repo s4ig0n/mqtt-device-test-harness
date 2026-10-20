@@ -1,5 +1,7 @@
 # MQTT Device Test Harness
 
+[![tests](https://github.com/s4ig0n/mqtt-device-test-harness/actions/workflows/tests.yml/badge.svg)](https://github.com/s4ig0n/mqtt-device-test-harness/actions/workflows/tests.yml)
+
 A pytest-based test automation harness for an IoT device that communicates over MQTT.
 
 The device under test is a simulated smart thermostat (`simulator/`). The harness (`tests/`) drives it
