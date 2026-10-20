@@ -1,0 +1,44 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  embedded-broker:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -r requirements.txt
+      - run: pytest -v --junitxml=report.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: junit-embedded-py${{ matrix.python-version }}
+          path: report.xml
+
+  mosquitto:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Start Mosquitto
+        run: docker run -d --name mosquitto -p 1883:1883 eclipse-mosquitto:2 mosquitto -c /mosquitto-no-auth.conf
+      - run: pip install -r requirements.txt
+      - run: pytest -v --junitxml=report.xml
+        env:
+          MQTT_HOST: 127.0.0.1
+          MQTT_PORT: "1883"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: junit-mosquitto
+          path: report.xml

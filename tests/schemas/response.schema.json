@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Command response",
+  "type": "object",
+  "required": ["id", "ok", "result", "error"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {"type": ["string", "null"]},
+    "ok": {"type": "boolean"},
+    "result": {"type": "object"},
+    "error": {"type": ["string", "null"]}
+  },
+  "if": {"properties": {"ok": {"const": true}}},
+  "then": {"properties": {"error": {"type": "null"}}},
+  "else": {"properties": {"error": {"type": "string"}}}
+}

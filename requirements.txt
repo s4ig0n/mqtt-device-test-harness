@@ -1,0 +1,5 @@
+paho-mqtt==2.1.0
+amqtt==0.12.1
+pytest==9.1.1
+pytest-timeout>=2.3
+jsonschema==4.26.0
