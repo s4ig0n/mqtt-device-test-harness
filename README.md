@@ -94,9 +94,23 @@ Response:
    broker, so if amqtt fixes it, the test will start passing and the marker gets flagged for removal.
    Against Mosquitto it runs as a normal test.
 
+## Flaky test hunt: two race conditions
+
+An intermittent error (roughly 1 in 10 runs) was tracked down by looping the suite until it failed and
+capturing the full traceback. It turned out to be two separate races:
+
+1. **Broker crash (amqtt 0.12.1).** The same connect-time loop behind the leak above `await`s while iterating
+   a broker-wide dict. If another client subscribes or disconnects at that moment, the broker raises
+   `RuntimeError: dictionary changed size during iteration` and the connecting client never gets its SUBACK.
+   `tests/helpers/broker.py` overrides that one method so it never suspends mid-loop.
+2. **Device stop-during-reboot (our simulator).** After a reboot the device announced "online" before its
+   telemetry thread had started, so a `stop()` arriving in that window crashed. Start, stop, crash and reboot
+   now share a lifecycle lock.
+
+Verified with 40 consecutive stress runs and no failures (before the fixes it failed within 10).
+
 ## Roadmap
 
-- [ ] Investigate an intermittent setup error seen once in ~16 full runs
-- [ ] HTML / JUnit test reports published from CI
+- [ ] HTML test report published from CI (JUnit XML is already uploaded as an artifact)
 - [ ] Network fault injection (latency, dropped connections) via a TCP proxy
 - [ ] MQTT 5 features (response topic, correlation data)

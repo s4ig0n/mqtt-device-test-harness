@@ -61,6 +61,9 @@ class ThermostatSimulator:
 
         self._stop = threading.Event()
         self._telemetry_thread: threading.Thread | None = None
+        # Serialises start/stop/crash/reboot so e.g. a stop() mid-reboot waits
+        # for the reboot to finish instead of tearing down a half-built client.
+        self._lifecycle_lock = threading.Lock()
         self._client = self._make_client()
 
     # ------------------------------------------------------------------ lifecycle
@@ -75,6 +78,10 @@ class ThermostatSimulator:
         return client
 
     def start(self) -> None:
+        with self._lifecycle_lock:
+            self._start()
+
+    def _start(self) -> None:
         self._stop.clear()
         self._client.connect(self.host, self.port, keepalive=10)
         self._client.loop_start()
@@ -83,19 +90,20 @@ class ThermostatSimulator:
 
     def stop(self) -> None:
         """Graceful shutdown: announce offline, then disconnect cleanly. Safe to call twice."""
-        if not self._client.is_connected():
-            self._stop.set()
-            self._client.loop_stop()
-            return
+        with self._lifecycle_lock:
+            self._shutdown(announce=self._client.is_connected())
+
+    def _shutdown(self, announce: bool) -> None:
         self._stop.set()
         if self._telemetry_thread:
             self._telemetry_thread.join(timeout=2)
-        info = self._client.publish(f"{self.base}/status", self._status_payload("offline"), qos=1, retain=True)
-        try:
-            info.wait_for_publish(timeout=2)
-        except RuntimeError:
-            pass  # already disconnected (e.g. after crash()), nothing to announce
-        self._client.disconnect()
+        if announce:
+            info = self._client.publish(f"{self.base}/status", self._status_payload("offline"), qos=1, retain=True)
+            try:
+                info.wait_for_publish(timeout=2)
+            except RuntimeError:
+                pass  # connection dropped in the meantime, nothing to announce
+            self._client.disconnect()
         self._client.loop_stop()
 
     def crash(self) -> None:
@@ -103,11 +111,12 @@ class ThermostatSimulator:
 
         The broker should notice and publish our Last Will.
         """
-        self._stop.set()
-        self._client.loop_stop()
-        sock = self._client.socket()
-        if sock:
-            sock.close()
+        with self._lifecycle_lock:
+            self._stop.set()
+            self._client.loop_stop()
+            sock = self._client.socket()
+            if sock:
+                sock.close()
 
     # ------------------------------------------------------------------ MQTT callbacks
 
@@ -212,18 +221,16 @@ class ThermostatSimulator:
     def _reboot(self):
         # Give the response a moment to leave before we drop the connection.
         time.sleep(0.1)
-        self._stop.set()
-        if self._telemetry_thread:
-            self._telemetry_thread.join(timeout=2)
-        self._client.publish(f"{self.base}/status", self._status_payload("offline"), qos=1, retain=True).wait_for_publish(2)
-        self._client.disconnect()
-        self._client.loop_stop()
-        with self._lock:
-            self._seq = 0
-            self._fault = None
-        time.sleep(0.2)
-        self._client = self._make_client()
-        self.start()
+        with self._lifecycle_lock:
+            if self._stop.is_set():
+                return  # stopped or crashed while the reboot was pending
+            self._shutdown(announce=True)
+            with self._lock:
+                self._seq = 0
+                self._fault = None
+            time.sleep(0.2)
+            self._client = self._make_client()
+            self._start()
 
     # ------------------------------------------------------------------ telemetry
 
