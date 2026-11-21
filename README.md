@@ -8,6 +8,12 @@ The device under test is a simulated smart thermostat (`simulator/`). The harnes
 the way a real QA/SDET team would test connected hardware: through its public messaging interface only,
 with no reaching into its internals.
 
+**Highlights**
+
+- 47 pytest tests across connection lifecycle, telemetry schema, commands, fault injection and broker conformance, run in CI on every push
+- Found a real conformance bug in the amqtt broker (retained messages leaking to other clients' subscriptions) and pinned it with a strict `xfail` test ([details](#bug-found-broker-leaks-retained-messages))
+- Tracked down two race conditions behind intermittent failures ([details](#flaky-test-hunt-two-race-conditions))
+
 ## What it tests
 
 | Area | Examples |
@@ -114,3 +120,7 @@ Verified with 40 consecutive stress runs and no failures (before the fixes it fa
 - [ ] HTML test report published from CI (JUnit XML is already uploaded as an artifact)
 - [ ] Network fault injection (latency, dropped connections) via a TCP proxy
 - [ ] MQTT 5 features (response topic, correlation data)
+
+## License
+
+MIT
