@@ -26,9 +26,23 @@ with no reaching into its internals.
 
 ## Quick start
 
+**Windows:** one command creates `.venv`, installs requirements and runs the suite:
+
+```powershell
+.\setup.ps1                     # embedded broker
+.\setup.ps1 -Mosquitto          # start Mosquitto in Docker and test against it
+.\setup.ps1 -- -m smoke -v      # anything after -- goes to pytest
+.\setup.ps1 -SkipTests          # just set up the venv
+```
+
+It's safe to re-run. If script execution is blocked, run it once with
+`powershell -ExecutionPolicy Bypass -File .\setup.ps1`.
+
+**macOS/Linux:**
+
 ```bash
 python -m venv .venv
-# Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate
+source .venv/bin/activate
 pip install -r requirements.txt
 pytest
 ```
@@ -53,6 +67,7 @@ pytest -k commands -v    # just the command tests, verbose
 ## Project layout
 
 ```
+setup.ps1                Windows one-step setup + test run
 simulator/
   device.py              the device under test (MQTT thermostat)
   __main__.py            run it by hand: python -m simulator --port 1883
